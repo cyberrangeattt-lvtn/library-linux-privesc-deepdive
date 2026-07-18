@@ -1,0 +1,220 @@
+---
+- name: Cài đặt các gói cần thiết
+  ansible.builtin.apt:
+    name:
+      - vim
+      - python3
+      - openssh-server
+      - openssh-client
+      - libcap2-bin
+      - wget
+      - cron
+      - sudo
+      - openssl
+    state: present
+    update_cache: true
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+
+# Chuỗi tài khoản: user -> dev -> ops -> root
+- name: Tạo nhóm ops
+  ansible.builtin.group:
+    name: ops
+    state: present
+
+- name: Tạo các tài khoản phục vụ bài huấn luyện
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    password: "{{ item.pass | password_hash('sha512', item.salt) }}"
+    shell: /bin/bash
+    create_home: true
+    groups: "{{ item.groups | default(omit) }}"
+  loop:
+    - { name: user, pass: "changeme", salt: "usertraining01" }
+    - { name: dev, pass: "dev_internal_only", salt: "devtraining001" }
+    - { name: ops, pass: "ops_internal_only", salt: "opstraining001", groups: "ops" }
+
+- name: Bật xác thực SSH bằng mật khẩu
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication yes'
+  notify: restart ssh
+
+- name: Bảo đảm SSH đang hoạt động
+  ansible.builtin.systemd:
+    name: ssh
+    state: started
+    enabled: true
+
+# Level 1: enumeration
+- name: Triển khai flag Level 1
+  ansible.builtin.copy:
+    src: level1.txt
+    dest: /home/user/level1.txt
+    owner: user
+    group: user
+    mode: '0600'
+
+# Level 2: SUID find copy owned by dev
+- name: Triển khai flag Level 2
+  ansible.builtin.copy:
+    src: level2.txt
+    dest: /home/dev/level2.txt
+    owner: dev
+    group: dev
+    mode: '0600'
+
+- name: Tạo bản sao find có SUID thuộc sở hữu của dev
+  ansible.builtin.copy:
+    src: /usr/bin/find
+    dest: /usr/local/bin/find-dev
+    remote_src: true
+    owner: dev
+    group: dev
+    mode: '4755'
+
+# Level 3: sudo vim dev -> ops
+- name: Triển khai flag Level 3
+  ansible.builtin.copy:
+    src: level3.txt
+    dest: /home/ops/level3.txt
+    owner: ops
+    group: ops
+    mode: '0600'
+
+- name: Tạo log ứng dụng cho bài sudo vim
+  ansible.builtin.copy:
+    src: app.log
+    dest: /var/log/app.log
+    owner: ops
+    group: ops
+    mode: '0644'
+
+- name: Cho phép dev chạy vim dưới quyền ops mà không cần mật khẩu
+  ansible.builtin.copy:
+    content: "dev ALL=(ops) NOPASSWD: /usr/bin/vim /var/log/app.log\n"
+    dest: /etc/sudoers.d/dev-vim-ops
+    owner: root
+    group: root
+    mode: '0440'
+    validate: 'visudo -cf %s'
+
+# Level 4: writable root cron job
+- name: Tạo thư mục ứng dụng mẫu
+  ansible.builtin.file:
+    path: /opt/app
+    state: directory
+    owner: root
+    group: ops
+    mode: '0755'
+
+- name: Tạo trạng thái ứng dụng mẫu
+  ansible.builtin.copy:
+    content: |
+      application=techcorp
+      environment=production
+    dest: /opt/app/config.ini
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Tạo thư mục scripts
+  ansible.builtin.file:
+    path: /opt/scripts
+    state: directory
+    owner: root
+    group: ops
+    mode: '0775'
+
+- name: Triển khai backup.sh có quyền ghi cho nhóm ops
+  ansible.builtin.copy:
+    src: backup.sh
+    dest: /opt/scripts/backup.sh
+    owner: root
+    group: ops
+    mode: '0775'
+
+- name: Đăng ký cron job chạy backup.sh bằng root mỗi phút
+  ansible.builtin.copy:
+    content: "* * * * * root /opt/scripts/backup.sh\n"
+    dest: /etc/cron.d/backup
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Bảo đảm cron đang hoạt động
+  ansible.builtin.systemd:
+    name: cron
+    state: started
+    enabled: true
+
+- name: Tạo thư mục SSH của root
+  ansible.builtin.file:
+    path: /root/.ssh
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Tạo SSH keypair của root nếu chưa tồn tại
+  ansible.builtin.command:
+    cmd: ssh-keygen -t rsa -b 2048 -N '' -f /root/.ssh/id_rsa
+    creates: /root/.ssh/id_rsa
+
+- name: Cho phép root đăng nhập bằng public key vừa tạo
+  ansible.builtin.shell: |
+    touch /root/.ssh/authorized_keys
+    grep -qxF "$(cat /root/.ssh/id_rsa.pub)" /root/.ssh/authorized_keys \
+      || cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
+    chmod 600 /root/.ssh/authorized_keys
+  args:
+    executable: /bin/bash
+
+- name: Cho phép root SSH bằng key nhưng không bằng mật khẩu
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin'
+    line: 'PermitRootLogin prohibit-password'
+  notify: restart ssh
+
+- name: Triển khai flag Level 4
+  ansible.builtin.copy:
+    src: level4.txt
+    dest: /root/level4.txt
+    owner: root
+    group: root
+    mode: '0600'
+
+# Level 5: Linux capabilities
+- name: Xác định binary Python 3 thực tế
+  ansible.builtin.command:
+    cmd: readlink -f /usr/bin/python3
+  register: python3_binary
+  changed_when: false
+
+- name: Gán cap_dac_read_search cho Python 3
+  ansible.builtin.command:
+    cmd: "setcap cap_dac_read_search+ep {{ python3_binary.stdout }}"
+  changed_when: true
+
+- name: Đặt mật khẩu root với salt cố định phục vụ bài crack hash
+  ansible.builtin.shell: |
+    echo "root:$(openssl passwd -6 -salt 'aB3xYtrainingsalt' 'R00tPassw0rdForCracking!')" | chpasswd -e
+  args:
+    executable: /bin/bash
+  no_log: true
+
+# Level 6: final root flag
+- name: Triển khai flag cuối cùng
+  ansible.builtin.copy:
+    src: flag.txt
+    dest: /root/flag.txt
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Khởi động lại SSH để áp dụng cấu hình
+  ansible.builtin.systemd:
+    name: ssh
+    state: restarted

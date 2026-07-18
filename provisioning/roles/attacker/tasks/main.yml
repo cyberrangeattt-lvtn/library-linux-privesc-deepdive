@@ -1,0 +1,35 @@
+---
+- name: Cài đặt công cụ phục vụ enumeration và crack mật khẩu
+  ansible.builtin.apt:
+    name:
+      - hashcat
+      - apache2
+    state: present
+    update_cache: true
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+
+- name: Tải linPEAS để attacker phục vụ qua HTTP
+  ansible.builtin.get_url:
+    url: https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh
+    dest: /var/www/html/linpeas.sh
+    mode: '0755'
+    timeout: 90
+  register: linpeas_download
+  retries: 3
+  delay: 5
+  until: linpeas_download is succeeded
+
+- name: Triển khai wordlist dành riêng cho bài lab
+  ansible.builtin.copy:
+    src: privesc-wordlist.txt
+    dest: /home/user/privesc-wordlist.txt
+    owner: user
+    group: user
+    mode: '0644'
+
+- name: Khởi động Apache
+  ansible.builtin.systemd:
+    name: apache2
+    state: started
+    enabled: true

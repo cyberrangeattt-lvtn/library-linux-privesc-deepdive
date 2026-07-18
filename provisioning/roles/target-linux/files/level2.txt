@@ -1,0 +1,1 @@
+FLAG{SUID_f1nd_3x3c_tr1ck}

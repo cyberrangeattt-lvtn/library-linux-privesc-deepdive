@@ -1,0 +1,44 @@
+name: library-linux-privesc-deepdive
+
+hosts:
+- name: attacker
+  base_box:
+    image: kali
+    mgmt_user: debian
+  flavor: standard.kali
+
+- name: target-linux
+  base_box:
+    image: ubuntu-20.04-x86_64
+    mgmt_user: debian
+  flavor: standard.small
+
+routers:
+- name: router
+  base_box:
+    image: debian-12-x86_64
+    mgmt_user: debian
+  flavor: standard.small
+
+wan:
+  name: internet-connection
+  cidr: 100.100.100.0/24
+
+networks:
+- name: lan
+  cidr: 10.0.1.0/24
+
+net_mappings:
+- host: attacker
+  network: lan
+  ip: 10.0.1.50
+- host: target-linux
+  network: lan
+  ip: 10.0.1.10
+
+router_mappings:
+- router: router
+  network: lan
+  ip: 10.0.1.1
+
+groups: []

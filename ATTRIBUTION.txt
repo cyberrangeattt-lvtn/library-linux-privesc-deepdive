@@ -1,0 +1,22 @@
+This repository uses a dual licensing approach:
+
+- The code (Ansible provisioning, topology, and all scripts/configuration
+  deployed to the training hosts) is licensed under the terms of the MIT
+  License (https://opensource.org/license/mit).
+- The game design and training content are licensed under a Creative
+  Commons Attribution 4.0 International License (CC BY 4.0).
+
+Attribution:
+
+All scenario content (usernames, credentials, flags, and narrative text)
+is original content created for this training lab. It is not based on any
+real-world system or breach.
+
+Third-party tools referenced/deployed as part of the training
+infrastructure (not part of the "flag content" itself):
+  - linpeas.sh, part of PEASS-ng (https://github.com/peass-ng/PEASS-ng)
+  - hashcat (https://hashcat.net)
+  - GTFOBins techniques referenced for SUID find and sudo vim
+    (https://gtfobins.github.io)
+
+Scenario design and CyberRangeCZ Platform adaptation by: [your name / team]
