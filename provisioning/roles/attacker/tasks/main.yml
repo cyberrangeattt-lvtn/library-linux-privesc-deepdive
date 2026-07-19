@@ -108,6 +108,14 @@
   register: enable_default_site
   changed_when: "'Enabling site 000-default' in enable_default_site.stdout"
 
+- name: Tạo thư mục log cho Apache
+  ansible.builtin.file:
+    path: /var/log/apache2
+    state: directory
+    owner: root
+    group: adm
+    mode: '0750'
+
 - name: Kiểm tra cú pháp cấu hình Apache
   ansible.builtin.command:
     cmd: apache2ctl configtest
