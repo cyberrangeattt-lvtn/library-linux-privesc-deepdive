@@ -4,15 +4,52 @@
     name:
       - hashcat
       - apache2
+      - curl
     state: present
     update_cache: true
   environment:
     DEBIAN_FRONTEND: noninteractive
 
+- name: Kiểm tra tiến trình đang lắng nghe trên cổng 80
+  ansible.builtin.shell: |
+    ss -ltnp 'sport = :80' || true
+  args:
+    executable: /bin/bash
+  register: port_80_status
+  changed_when: false
+
+- name: Dừng nginx nếu đang chiếm cổng 80
+  ansible.builtin.systemd:
+    name: nginx
+    state: stopped
+    enabled: false
+  when: "'nginx' in port_80_status.stdout"
+  failed_when: false
+
+- name: Dừng Python HTTP server cũ nếu đang chiếm cổng 80
+  ansible.builtin.shell: |
+    pkill -f "python3 -m http.server 80" || true
+  args:
+    executable: /bin/bash
+  when:
+    - "'python' in port_80_status.stdout"
+    - "'http.server' in port_80_status.stdout"
+  changed_when: false
+
+- name: Tạo thư mục DocumentRoot của Apache
+  ansible.builtin.file:
+    path: /var/www/html
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+
 - name: Tải linPEAS để attacker phục vụ qua HTTP
   ansible.builtin.get_url:
     url: https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh
     dest: /var/www/html/linpeas.sh
+    owner: www-data
+    group: www-data
     mode: '0755'
     timeout: 90
   register: linpeas_download
@@ -28,8 +65,71 @@
     group: user
     mode: '0644'
 
-- name: Khởi động Apache
+- name: Tạo cấu hình ServerName cho Apache
+  ansible.builtin.copy:
+    dest: /etc/apache2/conf-available/servername.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      ServerName attacker
+
+- name: Bật cấu hình ServerName
+  ansible.builtin.command:
+    cmd: a2enconf servername
+  register: enable_servername
+  changed_when: "'Enabling conf servername' in enable_servername.stdout"
+
+- name: Tạo lại VirtualHost mặc định của Apache
+  ansible.builtin.copy:
+    dest: /etc/apache2/sites-available/000-default.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      <VirtualHost *:80>
+          ServerName attacker
+          ServerAdmin webmaster@localhost
+          DocumentRoot /var/www/html
+
+          <Directory /var/www/html>
+              Options Indexes FollowSymLinks
+              AllowOverride None
+              Require all granted
+          </Directory>
+
+          ErrorLog ${APACHE_LOG_DIR}/error.log
+          CustomLog ${APACHE_LOG_DIR}/access.log combined
+      </VirtualHost>
+
+- name: Bật site mặc định của Apache
+  ansible.builtin.command:
+    cmd: a2ensite 000-default.conf
+  register: enable_default_site
+  changed_when: "'Enabling site 000-default' in enable_default_site.stdout"
+
+- name: Kiểm tra cú pháp cấu hình Apache
+  ansible.builtin.command:
+    cmd: apache2ctl configtest
+  register: apache_configtest
+  changed_when: false
+  failed_when: apache_configtest.rc != 0
+
+- name: Khởi động lại Apache
   ansible.builtin.systemd:
     name: apache2
-    state: started
+    state: restarted
     enabled: true
+
+- name: Chờ Apache mở cổng 80
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: 80
+    delay: 2
+    timeout: 30
+
+- name: Kiểm tra tải linPEAS qua Apache
+  ansible.builtin.uri:
+    url: http://127.0.0.1/linpeas.sh
+    method: GET
+    status_code: 200
