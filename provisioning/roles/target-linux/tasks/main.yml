@@ -41,6 +41,13 @@
     line: 'PasswordAuthentication yes'
   notify: restart ssh
 
+- name: Ghi đè PasswordAuthentication trong cloud-init config
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication yes'
+  notify: restart ssh
+
 - name: Bảo đảm SSH đang hoạt động
   ansible.builtin.systemd:
     name: ssh
