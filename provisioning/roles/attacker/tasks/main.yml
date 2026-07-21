@@ -144,7 +144,7 @@
     
 - name: Add passwords file to the home directory
   copy:
-    src: passlist.txt
+    src: privesc.txt
     dest: /home/user/privesc.txt
     owner: user
     mode: '0644'
