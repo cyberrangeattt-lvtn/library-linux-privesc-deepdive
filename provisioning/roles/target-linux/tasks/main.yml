@@ -46,6 +46,7 @@
     path: /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
     regexp: '^#?PasswordAuthentication'
     line: 'PasswordAuthentication yes'
+    create: true
   notify: restart ssh
 
 - name: Bảo đảm SSH đang hoạt động
