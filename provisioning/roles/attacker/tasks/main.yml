@@ -141,3 +141,16 @@
     url: http://127.0.0.1/linpeas.sh
     method: GET
     status_code: 200
+    
+- name: Add passwords file to the home directory
+  copy:
+    src: passlist.txt
+    dest: /usr/share/wordlists/passlist.txt
+    owner: user
+    mode: '0644'
+
+- name: Add password to passlist wordlist
+  ansible.builtin.lineinfile:
+    path: /usr/share/wordlists/passlist.txt
+    line: R00tPassw0rdForCracking!
+    create: true
