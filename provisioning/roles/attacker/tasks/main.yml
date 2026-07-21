@@ -57,13 +57,13 @@
   delay: 5
   until: linpeas_download is succeeded
 
-- name: Triển khai wordlist dành riêng cho bài lab
-  ansible.builtin.copy:
-    src: privesc-wordlist.txt
-    dest: /home/user/privesc-wordlist.txt
-    owner: user
-    group: user
-    mode: '0644'
+# - name: Triển khai wordlist dành riêng cho bài lab
+#   ansible.builtin.copy:
+#     src: privesc-wordlist.txt
+#     dest: /home/user/privesc-wordlist.txt
+#     owner: user
+#     group: user
+#     mode: '0644'
 
 - name: Tạo cấu hình ServerName cho Apache
   ansible.builtin.copy:
@@ -145,12 +145,12 @@
 - name: Add passwords file to the home directory
   copy:
     src: passlist.txt
-    dest: /home/user/passlist.txt
+    dest: /home/user/privesc.txt
     owner: user
     mode: '0644'
 
 - name: Add password to passlist wordlist
   ansible.builtin.lineinfile:
-    path: /home/user/passlist.txt
+    path: /home/user/privesc.txt
     line: R00tPassw0rdForCracking!
     create: true
