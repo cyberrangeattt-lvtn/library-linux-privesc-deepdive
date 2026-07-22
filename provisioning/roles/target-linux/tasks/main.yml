@@ -39,6 +39,7 @@
     path: /etc/ssh/sshd_config
     regexp: '^#?PasswordAuthentication'
     line: 'PasswordAuthentication yes'
+  become: true
   notify: restart ssh
 
 - name: Ghi đè PasswordAuthentication trong cloud-init config
@@ -47,6 +48,7 @@
     regexp: '^#?PasswordAuthentication'
     line: 'PasswordAuthentication yes'
     create: true
+  become: true
   notify: restart ssh
 
 - name: Bảo đảm SSH đang hoạt động
