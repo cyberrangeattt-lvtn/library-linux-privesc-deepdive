@@ -3,3 +3,4 @@
   systemd:
     name: ssh
     state: restarted
+  become: true
